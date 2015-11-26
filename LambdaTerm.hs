@@ -2,13 +2,14 @@ module LambdaTerm
     (
       VarName, Const, Term(..),
       isPrim, prettyShow,
-      (#), lambda, lambdas, lgh, occursIn, freeVars
+      (#), lambda, λ, lambdas, λs, lgh, occursIn, freeVars, boundVars,
+      renameVar, substitute, (/:), patternMatch,
+      _x,_y,_z,_u,_v,_w
     ) where
 
 import MyOps
 import Test.QuickCheck
 import qualified Data.Set as S
-import qualified Data.List as L(nub, sort)
 
 -- $setup
 -- >>> import Test.QuickCheck
@@ -38,7 +39,7 @@ newtype VarString = VarString {getVarString :: VarName}
 
 instance Arbitrary VarString where
   arbitrary = do
-    i <- choose (1,8)
+    i <- choose (1,6)
     return $ VarString (nameList !! i)
 
 -- | an infinite list of all available variable names
@@ -92,6 +93,9 @@ lambda = Abstr
 lambdas :: [VarName] -> Term -> Term
 lambdas vars t = foldr lambda t vars
 
+λs :: [VarName] -> Term -> Term
+λs = lambdas
+
 -- | the length of a term
 -- prop> lgh x + lgh y == lgh (x#y)
 -- prop> lgh x + 1 == lgh (lambda v x)
@@ -112,10 +116,8 @@ prop> Var x `occursIn` (lambda x m)
 True
 -}
 occursIn :: Term -> Term -> Bool
-p `occursIn` q | p == q = True
-p `occursIn` (Apply m n) = p `occursIn` m || p `occursIn` n
-p `occursIn` (Abstr v expr) = p == Var v || p `occursIn` expr
-_ `occursIn` _ = False
+occursIn p = patternMatch f /> not . null
+  where f x = if x == p then Just () else Nothing
 
 type Set = S.Set
 
@@ -171,11 +173,35 @@ substitute s@(x, n) l@(Abstr y p)
     | otherwise = lambda z (substitute s $ substitute (y, Var z) p)
     where nFrees = freeVars n
           (z, _) = renameVar (y, nFrees)
+substitute _ _ = error "unkonwn pattern"
 
 -- | operator of 'substitute'
 infixr 9 /:
 (/:) :: (VarName, Term) -> Term -> Term
 (/:) = substitute
+
+{- | Try to apply the function to all sub-patterns of the term, until the first Just-result encountered. Return Nothing if all sub-patterns make the function return Nothing.
+>>> :{
+let f a@(Apply _ _) = Just a
+    f _ = Nothing
+in patternMatch f (lambda "x" (_u # _v)) == Just (_u # _v)
+:}
+True
+
+>>> :{
+let f (a@(Abstr x (Var y))) | x==y = Just a
+    f _ = Nothing
+in patternMatch f (Apply (lambda "x" (Var "y")) (lambda "u" $ Var "u")) == Just (lambda "u" $ Var "u")
+:}
+True
+-}
+patternMatch :: (Term -> Maybe a) -> Term -> Maybe a
+patternMatch f u =
+  case u of
+    (Apply a b) -> f u `orElse` rec a `orElse` rec b
+    (Abstr v e) -> f u `orElse` rec (Var v) `orElse` rec e
+    t -> f t
+  where rec = patternMatch f
 
 
 -- common vars
