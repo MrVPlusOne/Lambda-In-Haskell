@@ -198,8 +198,8 @@ True
 patternMatch :: (Term -> Maybe a) -> Term -> Maybe a
 patternMatch f u =
   case u of
-    (Apply a b) -> f u `orElse` rec a `orElse` rec b
-    (Abstr v e) -> f u `orElse` rec (Var v) `orElse` rec e
+    (Apply a b) -> f u `mplus` rec a `mplus` rec b
+    (Abstr v e) -> f u `mplus` rec (Var v) `mplus` rec e
     t -> f t
   where rec = patternMatch f
 

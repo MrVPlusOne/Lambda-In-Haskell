@@ -1,7 +1,7 @@
 module MyOps where
 
 import Prelude
-import qualified Data.Generics.Aliases as A (orElse)
+import qualified Control.Monad as M (mplus)
 
 infixl 0 |>
 (|>) :: a -> (a->b) -> b
@@ -11,5 +11,5 @@ infixl 0 />
 (/>) :: (a->b) -> (b->c) -> a->c
 f /> g = g . f
 
-orElse :: Maybe a -> Maybe a -> Maybe a
-orElse = A.orElse
+mplus :: Maybe a -> Maybe a -> Maybe a
+mplus = M.mplus

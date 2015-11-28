@@ -59,7 +59,7 @@ tryReduceInSteps :: Int -> Term -> Maybe Term
 tryReduceInSteps s t = loop s [t] where
   loop n _ | n < 0 = Nothing
   loop n ts =
-    find isBnFrom ts `orElse` loop (n-1) (ts>>= reduceChoices)
+    find isBnFrom ts `mplus` loop (n-1) (ts>>= reduceChoices)
 
 try50 = tryReduceInSteps 50
 
