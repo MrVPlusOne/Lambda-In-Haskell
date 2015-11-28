@@ -54,8 +54,8 @@ reduceChoices _ = []
 {- | Use `reduceChoices` repeatedly until one λ-nf be found or max steps tried out.
 prop> parseReduce "(λx.x y)(λu.v u u)" == Just (parseExpr "v y y")
 prop> parseReduce "(λx. x(x(y z))x)(λu.u v)" == Just (parseExpr "y z v v (λu. u v)")
-prop> try50 (λs ["x","y"] (_y # _x) # _u # _v) == Just (_v # _u)
-prop> let expr = (λ "x" (_x # (_x # (_y # _z)) # _x)) # (λ "u" (_u # _v)) in try50 expr == Just (_y # _z # _v # _v # λ "u" (_u # _v))
+prop> parseReduce "(λx y. y x)u v" == Just (_v # _u)
+prop> parseReduce "(λx y z. x z(y z))((λx y. y x)u)((λx y. y x)v) w" == Just (parseExpr "w u(w v)")
 -}
 tryReduceInSteps :: Int -> Term -> Maybe Term
 tryReduceInSteps s t = loop s [t] where

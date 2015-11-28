@@ -1,7 +1,7 @@
 module LambdaTerm
     (
       VarName, Const, Term(..),
-      isPrim, prettyShow,
+      isPrim, prettyShow, prettyPrint,
       (#), lambda, λ, lambdas, λs, lgh, occursIn, freeVars, boundVars,
       renameVar, substitute, (/:), patternMatch,
       _x,_y,_z,_u,_v,_w
@@ -23,9 +23,9 @@ data Term = Var VarName
           | Atom Const
           | Apply Term Term
           | Abstr {variable::VarName, scope::Term}
-            deriving (Eq)
+            deriving (Eq, Show)
 
-instance Show Term where show = prettyShow
+-- instance Show Term where show = prettyShow
 
 instance Arbitrary Term where
   arbitrary =
@@ -71,10 +71,15 @@ prettyShow t =
   case t of
     Var v -> v
     Atom c -> '@':c
-    Apply x y -> prettyShow x ++ " " ++ surround y
-    Abstr v term -> "(λ" ++ v ++ ". " ++ prettyShow term ++ ")"
-  where surround a@(Apply _ _) = "(" ++ prettyShow a ++ ")"
-        surround other = prettyShow other
+    Apply x y -> surroundAbstr x ++ " " ++ surroundNonPrim y
+    Abstr v term -> "λ" ++ v ++ showBody
+      where showBody = case term of
+                              Abstr _ _ -> ' ': tail (prettyShow term)
+                              _ -> ". " ++ prettyShow term
+  where surroundNonPrim x =
+          if isPrim x then prettyShow x else "(" ++ prettyShow x ++ ")"
+        surroundAbstr l@(Abstr _ _) = "(" ++ prettyShow l ++ ")"
+        surroundAbstr other = prettyShow other
 
 prettyPrint = putStrLn . prettyShow
 
