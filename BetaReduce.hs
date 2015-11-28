@@ -6,6 +6,7 @@ module BetaReduce
 import MyOps
 import LambdaTerm
 import Data.List (find)
+import Parse
 
 {- $setup
 >>> import MyOps
@@ -51,7 +52,8 @@ reduceChoices (Abstr v p) = Abstr v <$> reduceChoices p
 reduceChoices _ = []
 
 {- | Use `reduceChoices` repeatedly until one λ-nf be found or max steps tried out.
-prop> try50 (λ "x" (_x # _y) # λ "u" (_v # _u # _u)) == Just (_v # _y # _y)
+prop> parseReduce "(λx.x y)(λu.v u u)" == Just (parseExpr "v y y")
+prop> parseReduce "(λx. x(x(y z))x)(λu.u v)" == Just (parseExpr "y z v v (λu. u v)")
 prop> try50 (λs ["x","y"] (_y # _x) # _u # _v) == Just (_v # _u)
 prop> let expr = (λ "x" (_x # (_x # (_y # _z)) # _x)) # (λ "u" (_u # _v)) in try50 expr == Just (_y # _z # _v # _v # λ "u" (_u # _v))
 -}
@@ -61,7 +63,11 @@ tryReduceInSteps s t = loop s [t] where
   loop n ts =
     find isBnFrom ts `mplus` loop (n-1) (ts>>= reduceChoices)
 
+try50 :: Term -> Maybe Term
 try50 = tryReduceInSteps 50
+
+parseReduce :: String -> Maybe Term
+parseReduce = try50 . parseExpr
 
 double :: Term
 double = λ "x" (_x # _x)
