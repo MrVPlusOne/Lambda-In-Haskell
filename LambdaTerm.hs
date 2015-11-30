@@ -1,6 +1,6 @@
 module LambdaTerm
     (
-      VarName, Const, Term(..),
+      VarName, Term(..),
       isPrim, prettyShow, prettyPrint,
       (#), lambda, λ, lambdas, λs, lgh, occursIn, freeVars, boundVars,
       renameVar, substitute, (/:), patternMatch,
@@ -17,10 +17,8 @@ import qualified Data.Set as S
 -- >>> import Data.List(sort)
 
 type VarName = String
-type Const = String
 
 data Term = Var VarName
-          | Atom Const
           | Apply Term Term
           | Abstr {variable::VarName, scope::Term}
             deriving (Eq, Show)
@@ -28,11 +26,16 @@ data Term = Var VarName
 -- instance Show Term where show = prettyShow
 
 instance Arbitrary Term where
-  arbitrary =
-    oneof [Var . getVarString <$> arbitrary
-          ,Atom <$> ((:[]) <$> choose ('a','z'))
-          ,Apply <$> arbitrary <*> arbitrary
-          ,Abstr <$> (getVarString <$> arbitrary) <*> arbitrary]
+  arbitrary = do
+    r <- choose (1,4) :: Gen Int
+    if r == 1
+      then oneof [Apply <$> arbitrary <*> arbitrary
+                 ,Abstr <$> (getVarString <$> arbitrary) <*> arbitrary]
+      else Var . getVarString <$> arbitrary
+    --
+    -- oneof [Var . getVarString <$> arbitrary
+    --       ,Apply <$> arbitrary <*> arbitrary
+    --       ,Abstr <$> (getVarString <$> arbitrary) <*> arbitrary]
 
 newtype VarString = VarString {getVarString :: VarName}
   deriving (Eq, Show)
@@ -63,14 +66,12 @@ prop> isPrim (Abstr x y) == False
 -}
 isPrim :: Term -> Bool
 isPrim (Var _) = True
-isPrim (Atom _) = True
 isPrim _ = False
 
 prettyShow :: Term -> String
 prettyShow t =
   case t of
     Var v -> v
-    Atom c -> '@':c
     Apply x y -> surroundAbstr x ++ " " ++ surroundNonPrim y
     Abstr v term -> "λ" ++ v ++ showBody
       where showBody = case term of
@@ -81,6 +82,7 @@ prettyShow t =
         surroundAbstr l@(Abstr _ _) = "(" ++ prettyShow l ++ ")"
         surroundAbstr other = prettyShow other
 
+prettyPrint :: Term -> IO ()
 prettyPrint = putStrLn . prettyShow
 
 infixl 8 #
@@ -142,7 +144,6 @@ freeVars = withBinds S.empty
         Var v -> if v `elem` binds then S.empty else S.singleton v
         Apply m n -> withBinds binds m `S.union` withBinds binds n
         Abstr x e -> withBinds (S.insert x binds) e
-        Atom _ -> S.empty
 
 {- | Return a list of all bounded variable names in the given term, please note
 that there may be some 'freeVars' have the same name with those bounded.
@@ -210,6 +211,7 @@ patternMatch f u =
 
 
 -- common vars
+_x,_y,_z,_u,_v,_w :: Term
 (_x, _y, _z, _u, _v, _w) =
   (Var "x",Var "y",Var "z",Var "u",Var "v",Var "w")
 

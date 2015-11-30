@@ -16,10 +16,9 @@ parseTerm = try(substitute <$> parseSubst <*> parseApply)
       v <- char '/' *> spaces *> parseName <* char ']'
       return (v, replace)
     parseApply = foldl1 Apply <$> (subTerms `sepSurround1` spaces)
-    subTerms = termInParens <|> parseAbstr <|> parseConst <|> parseVar
+    subTerms = termInParens <|> parseAbstr <|> parseVar
     termInParens = char '(' *> parseTerm <* char ')'
     parseName = many1 (noneOf sepChar)
-    parseConst = Atom <$> (char '@' *> parseName)
     parseVar = Var <$> parseName
     parseAbstr = do
       vars <- char 'λ' *> parseName `sepSurround1` spaces <* char '.'
@@ -36,7 +35,6 @@ sepChar = " \n@.*()[]/:"
 
 {- | Parse lamdba expression string into 'Term'
 prop> tryParseExpr "a" == Right (Var "a")
-prop> tryParseExpr "@abc" == Right (Atom "abc")
 prop> tryParseExpr " a λx. w v " == Right (Var "a" # lambda "x" (_w # _v))
 prop> tryParseExpr (prettyShow e) == Right e
 prop> tryParseExpr "λx y. x y y" == Right (λ "x" (λ "y" (_x # _y # _y)))
