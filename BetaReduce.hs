@@ -26,9 +26,9 @@ isBnFrom = patternMatch f /> null
         f _ = Nothing
 
 
-reduceOutter :: Term -> Maybe Term
-reduceOutter (Apply (Abstr v p) q) = Just ((v,q) /: p)
-reduceOutter _ = Nothing
+reduceOutter :: Term -> [Term]
+reduceOutter (Apply (Abstr v p) q) = [(v,q) /: p]
+reduceOutter _ = []
 
 {- | List all possible next steps to beta-reduce the term
 prop> head (λ "x" (_x # (_x # _y)) # n |> reduceChoices) == n#(n#_y)
@@ -44,10 +44,7 @@ True
 -}
 reduceChoices :: Term -> [Term]
 reduceChoices t@(Apply a b) =
-  direct ++ (flip Apply b <$> reduceChoices a) ++ (Apply a <$> reduceChoices b)
-  where direct = case reduceOutter t of
-                  Just x -> [x]
-                  Nothing -> []
+  reduceOutter t ++ (flip Apply b <$> reduceChoices a) ++ (Apply a <$> reduceChoices b)
 reduceChoices (Abstr v p) = Abstr v <$> reduceChoices p
 reduceChoices _ = []
 
@@ -69,11 +66,19 @@ try50 = tryReduceInSteps 50
 parseReduce :: String -> Maybe Term
 parseReduce = try50 . parseExpr
 
+parseReducePrint s =
+  print $ case parseReduce s of
+    Just r -> prettyShow r
+    Nothing -> "can't reduce in 50 steps"
+
 double :: Term
 double = λ "x" (_x # _x)
 
 omega :: Term
 omega = double # double
 
-cond = \t -> (null . reduceChoices) t -- == isBnFrom t
-result = let n = _u in try50 (λ "x" (_x # (_x # _y)) # n) == Just (n # (n # _y))
+fixedPointCombinator :: Term
+fixedPointCombinator = parseExpr "λy. (λx. y(x x))(λx. y(x x))"
+
+result = (fixedPointCombinator # l)
+  where l = parseExpr "λy. (λx. x y x)"
