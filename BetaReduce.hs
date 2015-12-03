@@ -1,6 +1,7 @@
 module BetaReduce
     (
-      isBnFrom
+      isBnFrom, tryReduceInSteps, reduceChoices, betaEqual,
+      double, omega, fixedPointCombinator
     ) where
 
 import MyOps
@@ -48,13 +49,14 @@ reduceChoices t@(Apply a b) =
 reduceChoices (Abstr v p) = Abstr v <$> reduceChoices p
 reduceChoices _ = []
 
+type Steps = Int
 {- | Use `reduceChoices` repeatedly until one λ-nf be found or max steps tried out.
 prop> parseReduce "(λx.x y)(λu.v u u)" == Just (parseExpr "v y y")
 prop> parseReduce "(λx. x(x(y z))x)(λu.u v)" == Just (parseExpr "y z v v (λu. u v)")
 prop> parseReduce "(λx y. y x)u v" == Just (_v # _u)
 prop> parseReduce "(λx y z. x z(y z))((λx y. y x)u)((λx y. y x)v) w" == Just (parseExpr "w u(w v)")
 -}
-tryReduceInSteps :: Int -> Term -> Maybe Term
+tryReduceInSteps :: Steps -> Term -> Maybe Term
 tryReduceInSteps s t = loop s [t] where
   loop n _ | n < 0 = Nothing
   loop n ts =
@@ -66,8 +68,9 @@ try50 = tryReduceInSteps 50
 parseReduce :: String -> Maybe Term
 parseReduce = try50 . parseExpr
 
+parseReducePrint :: String -> IO ()
 parseReducePrint s =
-  print $ case parseReduce s of
+  putStrLn $ case parseReduce s of
     Just r -> prettyShow r
     Nothing -> "can't reduce in 50 steps"
 
@@ -80,5 +83,6 @@ omega = double # double
 fixedPointCombinator :: Term
 fixedPointCombinator = parseExpr "λy. (λx. y(x x))(λx. y(x x))"
 
-result = (fixedPointCombinator # l)
-  where l = parseExpr "λy. (λx. x y x)"
+betaEqual :: Steps -> Term -> Term -> Maybe Bool
+betaEqual steps x y =
+  alphaEqual <$> (tryReduceInSteps steps x) <*> (tryReduceInSteps steps y)

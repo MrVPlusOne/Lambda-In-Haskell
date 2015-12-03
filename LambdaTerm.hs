@@ -4,26 +4,28 @@ module LambdaTerm
       isPrim, prettyShow, prettyPrint,
       (#), lambda, λ, lambdas, λs, lgh, occursIn, freeVars, boundVars,
       renameVar, substitute, (/:), patternMatch,
+      alphaEqual, subTerms,
       _x,_y,_z,_u,_v,_w
     ) where
 
 import MyOps
-import Test.QuickCheck
+import Test.QuickCheck hiding (subterms)
 import qualified Data.Set as S
 
 -- $setup
 -- >>> import Test.QuickCheck
 -- >>> import MyOps
 -- >>> import Data.List(sort)
+-- >>> import Parse
 
 type VarName = String
 
 data Term = Var VarName
           | Apply Term Term
           | Abstr {variable::VarName, scope::Term}
-            deriving (Eq, Show)
+            deriving (Eq, Ord)
 
--- instance Show Term where show = prettyShow
+instance Show Term where show = prettyShow
 
 instance Arbitrary Term where
   arbitrary = do
@@ -32,10 +34,6 @@ instance Arbitrary Term where
       then oneof [Apply <$> arbitrary <*> arbitrary
                  ,Abstr <$> (getVarString <$> arbitrary) <*> arbitrary]
       else Var . getVarString <$> arbitrary
-    --
-    -- oneof [Var . getVarString <$> arbitrary
-    --       ,Apply <$> arbitrary <*> arbitrary
-    --       ,Abstr <$> (getVarString <$> arbitrary) <*> arbitrary]
 
 newtype VarString = VarString {getVarString :: VarName}
   deriving (Eq, Show)
@@ -209,14 +207,26 @@ patternMatch f u =
     t -> f t
   where rec = patternMatch f
 
+{- | Return wehter two term is alpha-equivalent
+prop> parseExpr "λx. x(λx. x)" `alphaEqual` parseExpr "λy. y(λx. x)"
+prop> parseExpr "λy. y(λx. y)" `alphaEqual` parseExpr "λy. y(λx. x)" |> not
+prop> parseExpr "λy. y(λy. x)" `alphaEqual` parseExpr "λy. y(λx. x)" |> not
+prop> parseExpr "λx. x(λz. y)" `alphaEqual` parseExpr " λz. z(λz. y)"
+prop> x `alphaEqual` x
+-}
+alphaEqual :: Term -> Term -> Bool
+alphaEqual (Var a) (Var b) = a == b
+alphaEqual (Apply x1 x2) (Apply y1 y2) = x1 `alphaEqual` y1 && x2 `alphaEqual` y2
+alphaEqual l1@(Abstr v1 _) (Abstr v2 e2) =
+  not (v2 `S.member` freeVars l1) && l1 == Abstr v1 ((v2, Var v1) /: e2)
+alphaEqual _ _ = False
 
+
+subTerms :: Term -> S.Set Term
+subTerms x@(Var _) = S.singleton x
+subTerms l@(Abstr _ e) = S.insert l (subTerms e)
+subTerms a@(Apply x y) = S.insert a (subTerms x `S.union` subTerms y)
 -- common vars
 _x,_y,_z,_u,_v,_w :: Term
 (_x, _y, _z, _u, _v, _w) =
   (Var "x",Var "y",Var "z",Var "u",Var "v",Var "w")
-
-example =
-  ("x", lambda "y" (_v # _y)) /: p
-  where p = _y # (lambda "v" (_x # _v))
-
-lghExample = lgh (_x # lambda "y" (_y # _u # _x))

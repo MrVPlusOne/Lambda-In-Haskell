@@ -1,6 +1,6 @@
 module Parse
     (
-      tryParseExpr, parseExpr
+      tryParseExpr, parseExpr, (<~)
     ) where
 
 import MyOps
@@ -47,3 +47,6 @@ parseExpr s =
   case tryParseExpr s of
     Right ok -> ok
     Left e -> error $ show e
+
+(<~) :: (Term -> a) -> String -> a
+f <~ str = f (parseExpr str)
