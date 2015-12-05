@@ -8,6 +8,8 @@ import Control.Applicative
 import Data.Maybe (fromMaybe)
 import TypedTerm
 
+parseInffer :: String -> IO ()
+parseInffer = putStrLn . infferThenShow . parseExpr
 
 zero = parseExpr "λf x. x"
 one = parseExpr "λf x. f x"
@@ -22,6 +24,5 @@ m = half # half
 
 result = parseInffer "λx y z . y(x z)x"
 
-parseInffer = putStrLn . infferThenShow . parseExpr
 
 reduce x = fromMaybe (error "can't reduce") (tryReduceInSteps 25 x)
