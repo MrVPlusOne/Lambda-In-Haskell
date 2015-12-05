@@ -2,7 +2,7 @@
 module TypedTerm
     (
       tyVar, (~>), TyTree,
-      infferType, showTypeTree, infferThenShow
+      inferType, showTypeTree, inferThenShow
     ) where
 
 import LambdaTerm
@@ -101,9 +101,9 @@ type EnvCanFail a = StateT TyEnv Mayfail a
 
 type TyTree = TermTree Type
 
-infferThenShow :: Term -> String
-infferThenShow term =
-  case infferType term of
+inferThenShow :: Term -> String
+inferThenShow term =
+  case inferType term of
     Left msg -> msg
     Right (tp, tpTree) -> showTypeTree term tpTree ++ " : " ++ show tp
 
@@ -120,8 +120,8 @@ showTypeTree term tree =
         surroundAbstr other tp = showTypeTree other tp
 
 
-infferType :: Term -> Mayfail (Type, TyTree)
-infferType term = cleanTree <$> runStateT (infferInEnv term initType [term]) emptyEnv
+inferType :: Term -> Mayfail (Type, TyTree)
+inferType term = cleanTree <$> runStateT (inferInEnv term initType [term]) emptyEnv
   where initType = tyVar 0
         cleanTree ((tp, tree), env) = (updateType tp , updateType <$> tree)
           where
@@ -137,13 +137,13 @@ infferType term = cleanTree <$> runStateT (infferInEnv term initType [term]) emp
 
 type Trace = [Term]
 
-infferInEnv :: Term -> Type -> Trace -> EnvCanFail (Type, TyTree)
-infferInEnv term reqType trace =
+inferInEnv :: Term -> Type -> Trace -> EnvCanFail (Type, TyTree)
+inferInEnv term reqType trace =
   case term of
     Apply term1 term2 -> do
       newType <- newTyVarFromEnv
-      (type2, tree2) <- infferInEnv term2 newType (term2: trace)
-      (TyArrow _ whole, tree1) <- infferInEnv term1 (type2 ~> reqType) (term1: trace)
+      (type2, tree2) <- inferInEnv term2 newType (term2: trace)
+      (TyArrow _ whole, tree1) <- inferInEnv term1 (type2 ~> reqType) (term1: trace)
       return (whole, Apply tree1 tree2)
     Var name -> do
       env <- get
@@ -159,7 +159,7 @@ infferInEnv term reqType trace =
       bType <- newTyVarFromEnv
       oldEnv <- get
       updateEnvVar v varType
-      (bType', btree) <- infferInEnv body bType (body: trace)
+      (bType', btree) <- inferInEnv body bType (body: trace)
       totalType <- mergeTypesOfTerm (varType ~> bType') reqType
       case lookupEnv v oldEnv of
         Just oldType -> updateEnvVar v oldType
@@ -168,7 +168,7 @@ infferInEnv term reqType trace =
   where
     mergeTypesOfTerm t1 t2 = StateT $ \env ->
       case runStateT (mergeTypes t1 t2) env of
-        Left msg -> Left (msg ++ traceMsg ++ prettyShow term)
+        Left msg -> Left (msg ++ traceMsg)
         ok -> ok
     traceMsg = (\t -> "\n\tin " ++ prettyShow t) <$> trace |> concat
 

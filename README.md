@@ -2,7 +2,8 @@
 ### A haskell library for lambda calculus.
 
 This is a simple library I wrote while learning Type theory and Haskell.
-I hope this can help you.
+
+I wish this can help you.
 
 ## Usage and examples:
 
@@ -101,23 +102,23 @@ ghci> reduceChoices e2  -- list all possible β-reduction paths
 
 Simply typed lambda is provided by 'TypedTerm' module
 
-* Just use `infferThenShow` to type a term
+* Just use `inferThenShow` to type a term
 
 ```
-ghci> putStrLn $ infferThenShow e1  -- remember e1 == λf x. f y x
+ghci> putStrLn $ inferThenShow e1  -- remember e1 == λf x. f y x
 λf: t2 -> t1 -> t0. λx: t1. {f: t2 -> t1 -> t0} {y: t2} {x: t1} : (t2 -> t1 -> t0) -> t1 -> t0
-ghci> parseInffer "λx y . x(λz . y)y"
+ghci> parseinfer "λx y . x(λz . y)y"
 λx: (t1 -> t2) -> t2 -> t0. λy: t2. {x: (t1 -> t2) -> t2 -> t0} (λz: t1. {y: t2}) {y: t2} : ((t1 -> t2) -> t2 -> t0) -> t2 -> t0
 ```
 
-That gives back every variable's type. If you don't want this string result, use `infferType` instead.
+That gives back every variable's type. If you don't want this string result, use `inferType` instead.
 
 ```
-ghci> parseInffer "λx y . x(λz . x)y"
+ghci> parseinfer "λx y . x(λz . x)y"
 can't construct infinite type: t8 = (t7 -> t8) -> t5 -> t4
 	in x
 	in x (λz. x)
 	in x (λz. x) y
 	in λy. x (λz. x) y
-	in λx y. x (λz. x) yx
+	in λx y. x (λz. x) y
 ```
