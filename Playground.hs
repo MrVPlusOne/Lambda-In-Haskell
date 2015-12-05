@@ -6,6 +6,8 @@ import BetaReduce
 import Parse
 import Control.Applicative
 import Data.Maybe (fromMaybe)
+import TypedTerm
+
 
 zero = parseExpr "λf x. x"
 one = parseExpr "λf x. f x"
@@ -18,8 +20,8 @@ l = parseExpr "λu x y z. x y z u"
 half = lambda "v" (l#(_v#_v))
 m = half # half
 
-result = tryReduceInSteps 15 $ _x # _y # _z # m
+result = parseInffer "λx y z . y(x z)x"
 
-result2 = reduce $ m # _x # _y # _z
+parseInffer = putStrLn . infferThenShow . parseExpr
 
 reduce x = fromMaybe (error "can't reduce") (tryReduceInSteps 25 x)

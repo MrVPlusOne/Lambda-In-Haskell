@@ -1,6 +1,8 @@
+{-#LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+
 module LambdaTerm
     (
-      VarName, Term(..),
+      VarName, Term, TermTree(..), VarString(..),
       isPrim, prettyShow, prettyPrint,
       (#), lambda, λ, lambdas, λs, lgh, occursIn, freeVars, boundVars,
       renameVar, substitute, (/:), patternMatch,
@@ -14,16 +16,17 @@ import qualified Data.Set as S
 
 -- $setup
 -- >>> import Test.QuickCheck
--- >>> import MyOps
 -- >>> import Data.List(sort)
 -- >>> import Parse
 
 type VarName = String
 
-data Term = Var VarName
-          | Apply Term Term
-          | Abstr {variable::VarName, scope::Term}
-            deriving (Eq, Ord)
+type Term = TermTree VarName
+
+data TermTree a = Var a
+                | Apply (TermTree a) (TermTree a)
+                | Abstr {variable::a, scope::TermTree a}
+                  deriving (Eq, Ord)
 
 instance Show Term where show = prettyShow
 
@@ -226,6 +229,14 @@ subTerms :: Term -> S.Set Term
 subTerms x@(Var _) = S.singleton x
 subTerms l@(Abstr _ e) = S.insert l (subTerms e)
 subTerms a@(Apply x y) = S.insert a (subTerms x `S.union` subTerms y)
+
+instance Functor TermTree where
+  fmap f x =
+    case x of
+      Var a -> Var (f a)
+      Apply a b -> Apply (fmap f a) (fmap f b)
+      Abstr v body -> Abstr (f v) (fmap f body)
+
 -- common vars
 _x,_y,_z,_u,_v,_w :: Term
 (_x, _y, _z, _u, _v, _w) =

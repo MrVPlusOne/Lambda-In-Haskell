@@ -13,3 +13,16 @@ f /> g = g . f
 
 mplus :: Maybe a -> Maybe a -> Maybe a
 mplus = M.mplus
+
+type Mayfail = Either String
+
+good :: a -> Mayfail a
+good = Right
+
+wrong :: String -> Mayfail a
+wrong = Left
+
+surroundString :: Bool -> String -> String
+surroundString cond str
+  | cond = "(" ++ str ++ ")"
+  | otherwise = str
