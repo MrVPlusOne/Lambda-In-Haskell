@@ -1,8 +1,11 @@
+{-#LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+
 
 module TypedTerm
     (
-      tyVar, (~>), TyTree,
-      inferType, showTypeTree, inferThenShow
+      tyVar, (~>), TyTerm,
+      inferType, showTypeTree, inferThenShow,
+      inferTypeWithConstriant, inferConstraintShow
     ) where
 
 import LambdaTerm
@@ -35,9 +38,17 @@ isArrow :: TypeShape a -> Bool
 isArrow (TyArrow _ _) = True
 isArrow _ = False
 
-instance Show a => Show (TypeShape a) where
-  show (TyVar tid) = show tid
-  show (TyArrow t1 t2) = surroundString (isArrow t1) (show t1) ++ " -> " ++ show t2
+instance Show Type where
+  show = showTypeShape show
+
+instance Show (NamedType) where
+  show = showTypeShape id
+
+showTypeShape :: (a -> String) -> TypeShape a -> String
+showTypeShape toStr t =
+  case t of
+    (TyVar tid) -> toStr tid
+    (TyArrow t1 t2) -> surroundString (isArrow t1) (showTypeShape toStr t1) ++ " -> " ++ showTypeShape toStr t2
 
 instance Functor TypeShape where
   fmap f (TyVar a) = TyVar (f a)
@@ -48,8 +59,11 @@ infixr 9 ~>
 (~>) :: TypeShape t -> TypeShape t -> TypeShape t
 t1 ~> t2 = TyArrow t1 t2
 
-tyVar :: Int -> Type
-tyVar i = TyVar (TyId i)
+tyVar :: a -> TypeShape a
+tyVar = TyVar
+
+tyId :: Int -> Type
+tyId i = TyVar (TyId i)
 
 instance Arbitrary TyId where
   arbitrary = TyId <$> choose(1,8)
@@ -99,7 +113,7 @@ newTyVarFromEnv = TyVar <$> newIdFromEnv
 
 type EnvCanFail a = StateT TyEnv Mayfail a
 
-type TyTree = TermTree Type
+type TyTerm = TermShape Type
 
 inferThenShow :: Term -> String
 inferThenShow term =
@@ -107,7 +121,13 @@ inferThenShow term =
     Left msg -> msg
     Right (tp, tpTree) -> showTypeTree term tpTree ++ " : " ++ show tp
 
-showTypeTree :: Term -> TyTree -> String
+inferConstraintShow :: Term -> TyConstraintTree -> String
+inferConstraintShow term ctree =
+  case inferTypeWithConstriant term ctree of
+    Left msg -> msg
+    Right (tp, tpTree) -> showTypeTree term tpTree ++ " : " ++ show tp
+
+showTypeTree :: Term -> NamedTyTerm -> String
 showTypeTree term tree =
   case (term, tree) of
     (Var v, Var t) -> "{" ++ v ++ ": " ++ show t ++ "}"
@@ -120,9 +140,30 @@ showTypeTree term tree =
         surroundAbstr other tp = showTypeTree other tp
 
 
-inferType :: Term -> Mayfail (Type, TyTree)
-inferType term = cleanTree <$> runStateT (inferInEnv term initType [term]) emptyEnv
-  where initType = tyVar 0
+-- inferType :: Term -> Mayfail (Type, TyTerm)
+-- inferType term = cleanTree <$> runStateT (inferInEnv term initType [term]) emptyEnv
+--   where initType = tyId 0
+--         cleanTree ((tp, tree), env) = (updateType tp , updateType <$> tree)
+--           where
+--             updateType = remapId . replace
+--             replace oldType =
+--               rebuildType rebFunc oldType |> fromMaybe (error "rebuild failed")
+--                 where rebFunc v@(TyVar vid) =
+--                         Just $ fromMaybe v (M.lookup vid (typeMap env) >>= rebuildType rebFunc)
+--                       rebFunc _ = Nothing
+--             neatIdMap = mkIdRemap (envIndex env) (M.keysSet $ typeMap env)
+--             mapId i = fromMaybe (error "no key") (M.lookup i neatIdMap)
+--             remapId t = mapId <$> t
+
+inferType :: Term -> Mayfail (NamedType, NamedTyTerm)
+inferType term = inferTypeWithConstriant term (const Nothing <$> term)
+
+inferTypeWithConstriant :: Term -> TyConstraintTree -> Mayfail (NamedType, NamedTyTerm)
+inferTypeWithConstriant term ctree = do
+  (ty, tyTerm) <- cleanTree <$> runStateT (inferInEnv term initType [term]) emptyEnv
+  nameMap <- constraintTerm ctree tyTerm
+  return (toNamedType nameMap ty, toNamedType nameMap <$> tyTerm)
+  where initType = tyId 0
         cleanTree ((tp, tree), env) = (updateType tp , updateType <$> tree)
           where
             updateType = remapId . replace
@@ -134,10 +175,16 @@ inferType term = cleanTree <$> runStateT (inferInEnv term initType [term]) empty
             neatIdMap = mkIdRemap (envIndex env) (M.keysSet $ typeMap env)
             mapId i = fromMaybe (error "no key") (M.lookup i neatIdMap)
             remapId t = mapId <$> t
+        toNamedType :: M.Map TyId NamedType -> Type -> NamedType
+        toNamedType nameMap t = rebuildType repId t |> fromMaybe (error "replace id failed")
+          where
+            repId v@(TyVar vid) =
+              Just $ fromMaybe (TyVar $ show v) (M.lookup vid nameMap)
+            repId _ = Nothing
 
 type Trace = [Term]
 
-inferInEnv :: Term -> Type -> Trace -> EnvCanFail (Type, TyTree)
+inferInEnv :: Term -> Type -> Trace -> EnvCanFail (Type, TyTerm)
 inferInEnv term reqType trace =
   case term of
     Apply term1 term2 -> do
@@ -187,9 +234,9 @@ deleteEnvVar v = do
   put $ env `updateVarMap` M.delete v (varMap env)
 
 -- | change all type vars of one specific id in the env to another term
--- prop> let mkEnv = singletonEnv "a" in (varMap <$> execStateT (updateEnvType (TyId 1) randT) (mkEnv (tyVar 1))) == return (varMap $ mkEnv randT)
--- prop> let mkEnv = singletonEnv "a" in (varMap <$> execStateT (updateEnvType (TyId 2) randT) (mkEnv (tyVar 1))) == return (varMap $ mkEnv (tyVar 1))
--- prop> let {mkEnv = singletonEnv "a"; i1 = (TyId 1)} in (varMap <$> execStateT (updateEnvType i1 randT) (mkEnv (tyVar 1 ~> tyVar 1))) == return (varMap $ mkEnv (randT ~> randT))
+-- prop> let mkEnv = singletonEnv "a" in (varMap <$> execStateT (updateEnvType (TyId 1) randT) (mkEnv (tyId 1))) == return (varMap $ mkEnv randT)
+-- prop> let mkEnv = singletonEnv "a" in (varMap <$> execStateT (updateEnvType (TyId 2) randT) (mkEnv (tyId 1))) == return (varMap $ mkEnv (tyId 1))
+-- prop> let {mkEnv = singletonEnv "a"; i1 = (TyId 1)} in (varMap <$> execStateT (updateEnvType i1 randT) (mkEnv (tyId 1 ~> tyId 1))) == return (varMap $ mkEnv (randT ~> randT))
 updateEnvType :: TyId -> Type -> EnvCanFail ()
 updateEnvType i1 (TyVar i2) | i1 == i2 = return ()
 updateEnvType tid tp = do
@@ -226,7 +273,7 @@ mergeTypes arrow@(TyArrow t1 t2) term2 =
 -- |
 -- prop> rebuildType (const Nothing) t == Nothing
 -- prop> let f x = case x of { v@(TyVar _) -> Just v; _ -> Nothing} in rebuildType f x == Just x
-rebuildType :: Alternative m => (Type -> m Type) -> Type -> m Type
+rebuildType :: Alternative m => (TypeShape a -> m (TypeShape b)) -> TypeShape a -> m (TypeShape b)
 rebuildType fm v@(TyVar _) = fm v
 rebuildType fm a@(TyArrow t1 t2) =
   fm a <|> TyArrow <$> rebuildType fm t1 <*> rebuildType fm t2
@@ -239,3 +286,46 @@ mkIdRemap :: Int -> S.Set TyId -> M.Map TyId TyId
 mkIdRemap maxId excludes =
   let keysLeft = S.fromList (TyId <$> [0..maxId]) `S.difference` excludes
   in M.fromList $ zip (S.toList keysLeft) (TyId <$> [0..])
+
+-- | represent a partially-typed constraint of a term
+type NamedType = TypeShape String
+type TyConstraintTree = TermShape (Maybe NamedType)
+type NamedTyTerm = TermShape NamedType
+
+constraintTerm :: TyConstraintTree -> TyTerm -> Mayfail (M.Map TyId NamedType)
+constraintTerm ctree tree =
+  case (ctree, tree) of
+    (Var (Just rt), Var t) -> constraintType t rt
+    (Var Nothing, _) -> good M.empty
+    (Apply rt1 rt2, Apply t1 t2) -> do
+      result1 <- constraintTerm rt1 t1
+      result2 <- constraintTerm rt2 t2
+      tryMergeMaps result1 result2
+    (Abstr (Just rvt) rbodyt, Abstr vt bodyt) -> do
+      result1 <- constraintType vt rvt
+      result2 <-  constraintTerm rbodyt bodyt
+      tryMergeMaps result1 result2
+    (Abstr Nothing rbodyt, Abstr _ bodyt) ->
+      constraintTerm rbodyt bodyt
+    _ -> wrong "constraint shape not match!"
+
+
+constraintType :: Type -> NamedType -> Mayfail (M.Map TyId NamedType)
+constraintType t1@(TyVar i1) t2 =
+  return $ M.singleton i1 t2
+constraintType arrow@(TyArrow t1 t2) term2 =
+  case term2 of
+    TyVar _ -> wrong $ "type " ++ show arrow ++ " can't be constraint to " ++ show term2
+    TyArrow t3 t4 -> do
+      l <- constraintType t1 t3
+      r <- constraintType t2 t4
+      tryMergeMaps l r
+
+tryMergeMaps :: (Ord k, Eq a, Show a) => M.Map k a -> M.Map k a -> Either String (M.Map k a)
+tryMergeMaps m1 m2 = m1 |> M.toList |> foldr foldF (good m2)
+  where foldF (k, a) acc = do
+          accmap <- acc
+          case M.lookup k accmap of
+            Nothing -> return $ M.insert k a accmap
+            Just b -> if a==b then acc
+                      else wrong $ show a ++ " can't be " ++ show b

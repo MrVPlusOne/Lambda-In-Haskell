@@ -2,7 +2,7 @@
 
 module LambdaTerm
     (
-      VarName, Term, TermTree(..), VarString(..),
+      VarName, Term, TermShape(..), VarString(..),
       isPrim, prettyShow, prettyPrint,
       (#), lambda, λ, lambdas, λs, lgh, occursIn, freeVars, boundVars,
       renameVar, substitute, (/:), patternMatch,
@@ -21,11 +21,11 @@ import qualified Data.Set as S
 
 type VarName = String
 
-type Term = TermTree VarName
+type Term = TermShape VarName
 
-data TermTree a = Var a
-                | Apply (TermTree a) (TermTree a)
-                | Abstr {variable::a, scope::TermTree a}
+data TermShape a = Var a
+                | Apply (TermShape a) (TermShape a)
+                | Abstr {variable::a, scope::TermShape a}
                   deriving (Eq, Ord)
 
 instance Show Term where show = prettyShow
@@ -87,7 +87,7 @@ prettyPrint :: Term -> IO ()
 prettyPrint = putStrLn . prettyShow
 
 infixl 8 #
-(#) :: Term -> Term -> Term
+(#) :: TermShape a -> TermShape a -> TermShape a
 (#) = Apply
 
 -- | make an 'Abstr' term
@@ -230,7 +230,7 @@ subTerms x@(Var _) = S.singleton x
 subTerms l@(Abstr _ e) = S.insert l (subTerms e)
 subTerms a@(Apply x y) = S.insert a (subTerms x `S.union` subTerms y)
 
-instance Functor TermTree where
+instance Functor TermShape where
   fmap f x =
     case x of
       Var a -> Var (f a)
