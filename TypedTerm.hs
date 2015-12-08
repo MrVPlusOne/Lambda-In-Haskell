@@ -5,7 +5,7 @@ module TypedTerm
     (
       tyVar, (~>), TyTerm,
       inferType, showTypeTree, inferThenShow,
-      inferTypeWithConstriant, inferConstraintShow
+      TyConstraintTree, NamedType, inferTypeWithConstriant, inferConstraintShow
     ) where
 
 import LambdaTerm
@@ -133,27 +133,11 @@ showTypeTree term tree =
     (Var v, Var t) -> "{" ++ v ++ ": " ++ show t ++ "}"
     (Apply x y, Apply tx ty) -> surroundAbstr x tx ++ " " ++ surroundNonPrim y ty
     (Abstr v body, Abstr tv tbody) -> "λ" ++ v ++ ": " ++ show tv ++ showBody
-      where showBody = ". " ++ showTypeTree body tbody
+      where showBody = " . " ++ showTypeTree body tbody
   where surroundNonPrim x tp =
           if isPrim x then showTypeTree x tp else "(" ++ showTypeTree x tp ++ ")"
         surroundAbstr l@(Abstr _ _) tp = "(" ++ showTypeTree l tp ++ ")"
         surroundAbstr other tp = showTypeTree other tp
-
-
--- inferType :: Term -> Mayfail (Type, TyTerm)
--- inferType term = cleanTree <$> runStateT (inferInEnv term initType [term]) emptyEnv
---   where initType = tyId 0
---         cleanTree ((tp, tree), env) = (updateType tp , updateType <$> tree)
---           where
---             updateType = remapId . replace
---             replace oldType =
---               rebuildType rebFunc oldType |> fromMaybe (error "rebuild failed")
---                 where rebFunc v@(TyVar vid) =
---                         Just $ fromMaybe v (M.lookup vid (typeMap env) >>= rebuildType rebFunc)
---                       rebFunc _ = Nothing
---             neatIdMap = mkIdRemap (envIndex env) (M.keysSet $ typeMap env)
---             mapId i = fromMaybe (error "no key") (M.lookup i neatIdMap)
---             remapId t = mapId <$> t
 
 inferType :: Term -> Mayfail (NamedType, NamedTyTerm)
 inferType term = inferTypeWithConstriant term (const Nothing <$> term)
@@ -270,9 +254,6 @@ mergeTypes arrow@(TyArrow t1 t2) term2 =
       rtype <- mergeTypes t2 t4
       return $ ltype ~> rtype
 
--- |
--- prop> rebuildType (const Nothing) t == Nothing
--- prop> let f x = case x of { v@(TyVar _) -> Just v; _ -> Nothing} in rebuildType f x == Just x
 rebuildType :: Alternative m => (TypeShape a -> m (TypeShape b)) -> TypeShape a -> m (TypeShape b)
 rebuildType fm v@(TyVar _) = fm v
 rebuildType fm a@(TyArrow t1 t2) =

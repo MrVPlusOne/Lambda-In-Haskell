@@ -22,7 +22,9 @@ l = parseExpr "λu x y z. x y z u"
 half = lambda "v" (l#(_v#_v))
 m = half # half
 
-result = putStrLn $ inferConstraintShow e cons
+result = parsePrint "λa: A . f a"
+
+parsePrint = putStrLn . (uncurry inferConstraintShow . parseTypedTerm)
 
 e = _x # _y
 
