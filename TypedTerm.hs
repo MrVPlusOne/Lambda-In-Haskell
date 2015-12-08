@@ -5,7 +5,7 @@ module TypedTerm
     (
       tyVar, (~>), TyTerm,
       inferType, showTypeTree, inferThenShow,
-      TyConstraintTree, NamedType, inferTypeWithConstriant, inferConstraintShow
+      TyConstraintTree, NamedType, NamedTyTerm, inferTypeWithConstriant, inferConstraintShow
     ) where
 
 import LambdaTerm
@@ -48,7 +48,7 @@ showTypeShape :: (a -> String) -> TypeShape a -> String
 showTypeShape toStr t =
   case t of
     (TyVar tid) -> toStr tid
-    (TyArrow t1 t2) -> surroundString (isArrow t1) (showTypeShape toStr t1) ++ " -> " ++ showTypeShape toStr t2
+    (TyArrow t1 t2) -> surroundString (isArrow t1) (showTypeShape toStr t1) ++ " → " ++ showTypeShape toStr t2
 
 instance Functor TypeShape where
   fmap f (TyVar a) = TyVar (f a)

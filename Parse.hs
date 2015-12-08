@@ -52,13 +52,13 @@ parseType :: CharParser () NamedType
 parseType = spaces *> parseArrow <* spaces
   where
     parseArrow = foldr1 (~>)  <$> ((spaces *> subTypes <* spaces) `sepBy1` arrow)
-    arrow = string "->"
+    arrow = string "->" <|> string "→"
     subTypes = typeInParens <|> parseTyVar <?> "type term"
     typeInParens = char '(' *> parseType <* char ')'
     parseTyVar = tyVar <$> parseName <?> "type variable"
 
 sepChar :: String
-sepChar = " \n@.*()[]{}/:-><"
+sepChar = " \n@.*()[]{}/:-><→"
 
 useParser :: CharParser () a -> String -> Either ParseError a
 useParser p = parse (p <* eof) ""

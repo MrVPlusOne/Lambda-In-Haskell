@@ -7,6 +7,7 @@ import Parse
 import Control.Applicative
 import Data.Maybe (fromMaybe)
 import TypedTerm
+import HtmlPrint
 
 parseInfer :: String -> IO ()
 parseInfer = putStrLn . inferThenShow . parseExpr
@@ -24,7 +25,7 @@ m = half # half
 
 result = parsePrint "λa: A . f a"
 
-parsePrint = putStrLn . (uncurry inferConstraintShow . parseTypedTerm)
+parsePrint = putStrLn . (uncurry inferConstraintHtml . parseTypedTerm)
 
 e = _x # _y
 
