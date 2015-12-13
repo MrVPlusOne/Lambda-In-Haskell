@@ -8,6 +8,8 @@ import Control.Applicative
 import Data.Maybe (fromMaybe)
 import TypedTerm
 import HtmlPrint
+import System.IO
+
 
 parseInfer :: String -> IO ()
 parseInfer = putStrLn . inferThenShow . parseExpr
@@ -23,9 +25,8 @@ l = parseExpr "λu x y z. x y z u"
 half = lambda "v" (l#(_v#_v))
 m = half # half
 
-result = parsePrint "λa: A . f a"
-
-parsePrint = putStrLn . (uncurry inferConstraintHtml . parseTypedTerm)
+parseToHtml :: String -> IO ()
+parseToHtml = writeFile "result.html" . mkPage "typed" . (uncurry inferConstraintHtml . parseTypedTerm)
 
 e = _x # _y
 

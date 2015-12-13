@@ -1,0 +1,9 @@
+.type{
+  color: #d66d00;
+  font-style: italic;
+}
+
+.keyword{
+  color: #01028c;
+  font-weight: bold;
+}
