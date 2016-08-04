@@ -3,8 +3,6 @@
 
 This is a simple library I wrote while learning Type theory and Haskell.
 
-I wish this can help you.
-
 ## Usage and examples:
 
 First, `cd` into the project folder and load *Playground.hs* into ghci:
@@ -122,3 +120,20 @@ can't construct infinite type: t8 = (t7 -> t8) -> t5 -> t4
 	in λy. x (λz. x) y
 	in λx y. x (λz. x) y
 ```
+
+#### 3. Visualization through html
+
+Use `inferConstraintHtml :: Term -> TyConstraintTree -> Html` in the HtmlPrint module to convert a term along with a TyConstraintTree into html.
+
+For example:
+
+```
+:l Playground.hs
+parseToHtml "λf x. x"
+```
+
+This will output the result into 'result.html' file. Open it use a browser gives:
+
+![alt tag](visual.png)
+
+You can mouse over any element in this term to see its type as a tooltip.
